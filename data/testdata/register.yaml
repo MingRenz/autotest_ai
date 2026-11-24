@@ -1,0 +1,351 @@
+module: register
+
+# 所有注册用例共享的合法基础输入；具体用例只声明差异字段或 delete_fields。
+base_input: &base_input
+  first_name: "$REGISTER_FIRST_NAME"
+  last_name: "$REGISTER_LAST_NAME"
+  email: "$REGISTER_EMAIL"
+  password: "$REGISTER_PASSWORD"
+  phone: "$REGISTER_PHONE"
+
+cases:
+  # 正向：基础注册、可选 phone、合法邮箱等价类
+  - id: REG-001-A
+    title: 注册成功_完整合法数据
+    group: success
+    input: *base_input
+    expected:
+      status: 201
+      verify_login: true
+
+  - id: REG-001-B
+    title: 注册成功_phone字段省略
+    group: success
+    input: *base_input
+    delete_fields:
+      - phone
+    expected:
+      status: 201
+
+  - id: REG-001-C
+    title: 注册成功_phone为null
+    group: success
+    input:
+      <<: *base_input
+      phone: null
+    expected:
+      status: 201
+
+  - id: REG-003-A
+    title: 注册成功_普通邮箱
+    group: success
+    input:
+      <<: *base_input
+      email: "qa.reg.mail.standard.${RUN_ID}@example.com"
+    expected:
+      status: 201
+
+  - id: REG-003-B
+    title: 注册成功_加号别名邮箱
+    group: success
+    input:
+      <<: *base_input
+      email: "qa.reg.mail.alias.${RUN_ID}+tag@example.com"
+    expected:
+      status: 201
+
+  - id: REG-003-C
+    title: 注册成功_子域邮箱
+    group: success
+    input:
+      <<: *base_input
+      email: "qa.reg.mail.sub.${RUN_ID}@mail.example.com"
+    expected:
+      status: 201
+
+  # 字段校验：phone 类型、非法邮箱、必填缺失、空串、类型错误、超长、弱密码
+  - id: REG-002
+    title: 注册失败_phone为数字
+    group: field_validation
+    input:
+      <<: *base_input
+      phone: 13800138000
+    expected:
+      status: 422
+      error_field: phone
+
+  - id: REG-004-01
+    title: 注册失败_邮箱为空字符串
+    group: field_validation
+    input:
+      <<: *base_input
+      email: ""
+    expected:
+      status: 422
+      error_field: email
+
+  - id: REG-004-02
+    title: 注册失败_邮箱缺少@
+    group: field_validation
+    input:
+      <<: *base_input
+      email: "plainaddress"
+    expected:
+      status: 422
+      error_field: email
+
+  - id: REG-004-03
+    title: 注册失败_邮箱缺少域名
+    group: field_validation
+    input:
+      <<: *base_input
+      email: "qa.reg.invalid.03.${RUN_ID}@"
+    expected:
+      status: 422
+      error_field: email
+
+  - id: REG-004-04
+    title: 注册失败_邮箱缺少本地部分
+    group: field_validation
+    input:
+      <<: *base_input
+      email: "@example.com"
+    expected:
+      status: 422
+      error_field: email
+
+  - id: REG-004-05
+    title: 注册失败_邮箱含空格
+    group: field_validation
+    input:
+      <<: *base_input
+      email: "qa reg.invalid.05.${RUN_ID}@example.com"
+    expected:
+      status: 422
+      error_field: email
+
+  - id: REG-004-06
+    title: 注册失败_邮箱域名连续点
+    group: field_validation
+    input:
+      <<: *base_input
+      email: "qa.reg.invalid.06.${RUN_ID}@example..com"
+    expected:
+      status: 422
+      error_field: email
+
+  - id: REG-005
+    title: 注册失败_first_name缺失
+    group: field_validation
+    input: *base_input
+    delete_fields:
+      - first_name
+    expected:
+      status: 422
+      error_field: first_name
+
+  - id: REG-006
+    title: 注册失败_last_name缺失
+    group: field_validation
+    input: *base_input
+    delete_fields:
+      - last_name
+    expected:
+      status: 422
+      error_field: last_name
+
+  - id: REG-007
+    title: 注册失败_email缺失
+    group: field_validation
+    input: *base_input
+    delete_fields:
+      - email
+    expected:
+      status: 422
+      error_field: email
+
+  - id: REG-008
+    title: 注册失败_password缺失
+    group: field_validation
+    input: *base_input
+    delete_fields:
+      - password
+    expected:
+      status: 422
+      error_field: password
+
+  - id: REG-009
+    title: 注册失败_空first_name
+    group: field_validation
+    input:
+      <<: *base_input
+      first_name: ""
+    expected:
+      status: 422
+      error_field: first_name
+
+  - id: REG-010
+    title: 注册失败_空last_name
+    group: field_validation
+    input:
+      <<: *base_input
+      last_name: ""
+    expected:
+      status: 422
+      error_field: last_name
+
+  - id: REG-011
+    title: 注册失败_空password
+    group: field_validation
+    input:
+      <<: *base_input
+      password: ""
+    expected:
+      status: 422
+      error_field: password
+
+  - id: REG-012
+    title: 注册失败_first_name为数字
+    group: field_validation
+    input:
+      <<: *base_input
+      first_name: 123
+    expected:
+      status: 422
+      error_field: first_name
+
+  - id: REG-013
+    title: 注册失败_last_name为数组
+    group: field_validation
+    input:
+      <<: *base_input
+      last_name:
+        - Register
+    expected:
+      status: 422
+      error_field: last_name
+
+  - id: REG-014
+    title: 注册失败_email为数字
+    group: field_validation
+    input:
+      <<: *base_input
+      email: 123
+    expected:
+      status: 422
+      error_field: email
+
+  - id: REG-015
+    title: 注册失败_password为对象
+    group: field_validation
+    input:
+      <<: *base_input
+      password:
+        value: "Qa!Passw0rd#2026"
+    expected:
+      status: 422
+      error_field: password
+
+  - id: REG-016
+    title: 注册失败_超长邮箱
+    group: field_validation
+    input:
+      <<: *base_input
+      email: "${LONG_EMAIL}"
+    expected:
+      status: 422
+      error_field: email
+
+  - id: REG-017
+    title: 注册失败_弱密码1位
+    group: field_validation
+    input:
+      <<: *base_input
+      password: "P"
+    expected:
+      status: 422
+      error_field: password
+
+  # 请求级异常
+  - id: REG-020
+    title: 注册失败_请求体缺失
+    group: request_invalid
+    request:
+      body: null
+      content_type: "application/json"
+    expected:
+      status: 422
+
+  - id: REG-021
+    title: 注册失败_JSON格式错误
+    group: request_invalid
+    request:
+      body: '{"email":'
+      content_type: "application/json"
+    expected:
+      status: 400
+
+  - id: REG-022
+    title: 注册失败_ContentType错误
+    group: request_invalid
+    request:
+      body: "first_name=Qa&last_name=Form&email=qa.register.form.${RUN_ID}%40example.com&password=Qa%21Passw0rd%232026"
+      content_type: "application/x-www-form-urlencoded"
+    expected:
+      status: 415
+
+  # 重复注册与并发
+  - id: REG-018
+    title: 注册失败_邮箱重复
+    group: duplicate
+    input: *base_input
+    expected:
+      status: 409
+
+  - id: REG-019
+    title: 注册失败_并发相同邮箱
+    group: concurrent
+    input: *base_input
+    expected:
+      status: 409
+
+  # 角色提权
+  - id: REG-023
+    title: 注册成功_额外role字段不提权
+    group: mass_assignment
+    input:
+      <<: *base_input
+      role: admin
+    expected:
+      status: 201
+      verify_role: true
+
+  # XSS / SQLi 字符串
+  - id: REG-024
+    title: 注册成功_first_name包含XSS字符串
+    group: security
+    input:
+      <<: *base_input
+      first_name: "<script>alert('qa')</script>"
+    expected:
+      status: 201
+      verify_field: first_name
+
+  - id: REG-025
+    title: 注册成功_last_name包含SQLi字符串
+    group: security
+    input:
+      <<: *base_input
+      last_name: "QA'); SELECT 1;--"
+    expected:
+      status: 201
+      verify_field: last_name
+
+  - id: REG-026
+    title: 注册成功_password包含SQLi字符串
+    group: security
+    input:
+      <<: *base_input
+      password: "' OR '1'='1"
+    expected:
+      status: 201
