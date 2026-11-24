@@ -10,6 +10,28 @@
 
 ## 项目简介
 
+- 目前使用的电商后端项目是：
+
+  - Donovan-Nudrak / E_commerce [https://github.com/Donovan-Nudrak/E_commerce](https://github.com/Donovan-Nudrak/E_commerce?utm_source=chatgpt.com)
+
+  - 项目技术栈：
+
+    - 后端：Python + FastAPI
+
+    - 数据库：PostgreSQL
+
+    - 缓存：Redis
+
+    - 部署：Docker Compose
+
+    - 接口文档：Swagger / OpenAPI
+
+  - 本地接口地址：
+
+    - Swagger：[http://localhost:8000/docs](http://localhost:8000/docs?utm_source=chatgpt.com)
+
+    - OpenAPI：[http://localhost:8000/openapi.json](http://localhost:8000/openapi.json?utm_source=chatgpt.com)
+
 本项目从一个最小可运行的登录用例出发，逐步演进为可扩展的接口自动化测试工程：
 
 - 分层清晰：`api`、`data`、`testcases`、`utils` 各司其职
@@ -152,7 +174,7 @@ auto_test_ai/
 │   └── account_api.py          # /me、删除账号、登出
 ├── data/
 │   ├── config/
-│   │   └── config.yaml         # 本地配置，不提交到 Git
+│   │   └── config.yaml         # 本地配置
 │   └── testdata/
 │       ├── login.yaml          # 登录参数化数据
 │       └── register.yaml       # 注册参数化数据
@@ -406,9 +428,3 @@ test id = LOGIN-003_登录失败_密码错误
 - [ ] 登录/注册之外的模块扩展
 - [ ] AI Agent 辅助生成测试数据与失败分析
 - [ ] CI 集成与 Allure 报告归档
-
----
-
-## License
-
-本项目用于学习与本地测试实践；如需开源发布，请补充正式的 `LICENSE` 文件。
