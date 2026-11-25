@@ -122,8 +122,6 @@ RATE_LIMIT_WAIT key=register limit=5/60.0s wait=...
 | 报告 | Allure |
 | 数据 | YAML / JSON |
 | 配置 | YAML + 环境变量覆盖 |
-| 并发 | 不使用 pytest-xdist；仅保留并发重复注册用例 |
-| 容器化 | Docker（规划中，当前以本地 cekai 环境为主） |
 | AI Agent | 辅助测试设计、用例生成、框架重构与评审，不是运行时依赖 |
 
 ---
