@@ -73,6 +73,7 @@ cases:
     expected:
       status: 422
       error_field: phone
+      verify_not_created: true
 
   - id: REG-004-01
     title: 注册失败_邮箱为空字符串
@@ -143,6 +144,7 @@ cases:
     expected:
       status: 422
       error_field: first_name
+      verify_not_created: true
 
   - id: REG-006
     title: 注册失败_last_name缺失
@@ -153,6 +155,7 @@ cases:
     expected:
       status: 422
       error_field: last_name
+      verify_not_created: true
 
   - id: REG-007
     title: 注册失败_email缺失
@@ -183,6 +186,7 @@ cases:
     expected:
       status: 422
       error_field: first_name
+      verify_not_created: true
 
   - id: REG-010
     title: 注册失败_空last_name
@@ -193,6 +197,7 @@ cases:
     expected:
       status: 422
       error_field: last_name
+      verify_not_created: true
 
   - id: REG-011
     title: 注册失败_空password
@@ -265,6 +270,7 @@ cases:
     expected:
       status: 422
       error_field: password
+      verify_not_created: true
 
   # 请求级异常
   - id: REG-020

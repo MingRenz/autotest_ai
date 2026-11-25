@@ -28,7 +28,7 @@ def _build_input(case, base):
         REGISTER_PHONE: base["phone"],
     }
     for key, value in list(payload.items()):
-        if value in replacements:
+        if isinstance(value, str) and value in replacements:
             payload[key] = replacements[value]
     return payload
 
@@ -94,7 +94,7 @@ def test_register_success(
 @allure.feature("注册模块")
 @allure.story("字段校验")
 def test_register_field_validation(
-    register_api, random_register_data, register_cleanup, case
+    register_api, login_api, random_register_data, register_cleanup, case
 ):
     allure.dynamic.title(case["title"])
     payload = _build_input(case, random_register_data)
@@ -110,6 +110,17 @@ def test_register_field_validation(
         f"{case['title']}: {response.text}"
     )
     _assert_error(response, case["expected"], case["title"])
+
+    if case["expected"].get("verify_not_created"):
+        login_response = login_api.login(
+            {"email": payload["email"], "password": payload["password"]}
+        )
+        assert login_response.status_code == 401, (
+            f"{case['title']}: 负向注册不应创建可登录账号，实际登录 {login_response.text}"
+        )
+        assert extract_token(login_response.json()) is None, (
+            f"{case['title']}: 负向注册后登录不应返回 Token"
+        )
 
 
 @pytest.mark.datafile("register.yaml", group="request_invalid")
@@ -140,7 +151,9 @@ def test_register_request_invalid(register_api, case):
 @allure.title("{case[title]}")
 @allure.feature("注册模块")
 @allure.story("重复注册")
-def test_register_duplicate(register_api, random_register_data, register_cleanup, case):
+def test_register_duplicate(
+    register_api, login_api, random_register_data, register_cleanup, case
+):
     allure.dynamic.title(case["title"])
     payload = _build_input(case, random_register_data)
 
@@ -153,8 +166,22 @@ def test_register_duplicate(register_api, random_register_data, register_cleanup
 
     with allure.step("重复注册"):
         duplicate_response = register_api.register(payload)
-    assert duplicate_response.status_code == case["expected"]["status"], (
-        f"{case['title']}: {duplicate_response.text}"
+    status_matches = duplicate_response.status_code == case["expected"]["status"]
+
+    with allure.step("验证首次账号仍可登录"):
+        original_login = login_api.login(
+            {"email": payload["email"], "password": payload["password"]}
+        )
+    assert original_login.status_code == 200, (
+        f"{case['title']}: 重复注册后原账号登录失败 {original_login.text}"
+    )
+    assert extract_token(original_login.json()), (
+        f"{case['title']}: 原账号登录未返回 Token"
+    )
+
+    assert status_matches, (
+        f"{case['title']}: 重复注册状态码错误，实际 {duplicate_response.status_code} "
+        f"{duplicate_response.text}"
     )
     _assert_error(duplicate_response, case["expected"], case["title"])
 

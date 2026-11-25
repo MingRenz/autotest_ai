@@ -8,6 +8,27 @@ _FILE_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 _CONSOLE_FORMAT = "%(levelname)s | %(message)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+# 这些 logger 默认 propagate=False，需要显式挂载报告采集 handler。
+LOGGER_NAMES = ("http", "fixtures", "rate_limit")
+
+
+class AllureLogHandler(logging.Handler):
+    """按测试用例收集自定义 logger 日志，由 conftest fixture 负责挂载/卸载。"""
+
+    def __init__(self):
+        super().__init__()
+        self.lines = []
+        self.setFormatter(logging.Formatter(_FILE_FORMAT, datefmt=_DATE_FORMAT))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.lines.append(self.format(record))
+        except Exception:
+            self.handleError(record)
+
+    def text(self) -> str:
+        return "\n".join(self.lines)
+
 
 def get_logger(name: str = "api") -> logging.Logger:
     """返回文件 + stdout 双通道 logger；重复调用不会重复挂 handler。"""

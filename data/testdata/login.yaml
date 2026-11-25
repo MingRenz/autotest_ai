@@ -182,6 +182,14 @@ cases:
     expected:
       status: 200
 
+  - id: LOGIN-ERROR-CONSISTENCY
+    title: 安全_错误密码与不存在用户返回相同认证失败信息
+    group: error_consistency
+    wrong_password: "Wrong!Passw0rd#2026"
+    unknown_email: "qa.login.missing.${RUN_ID}@example.com"
+    expected:
+      status: 401
+
   # 管理员登录
   - id: LOGIN-001
     title: 登录成功_管理员正确账号密码

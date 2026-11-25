@@ -6,11 +6,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import allure
 import pytest
 
 from api.http_client import HttpClient
 from utils.config import load_config
 from utils.data_loader import load_cases
+from utils.logger import LOGGER_NAMES, AllureLogHandler, get_logger
 from utils.token import extract_token
 
 
@@ -46,6 +48,25 @@ def case(request, case_id):
         if item["id"] == case_id:
             return item
     pytest.fail(f"未找到测试数据: {case_id}")
+
+
+@pytest.fixture(autouse=True)
+def capture_test_logs():
+    """按测试用例收集自定义 logger，结束后作为独立 Allure 文本附件。"""
+    handler = AllureLogHandler()
+    loggers = [get_logger(name) for name in LOGGER_NAMES]
+    for logger in loggers:
+        logger.addHandler(handler)
+
+    yield
+
+    for logger in loggers:
+        logger.removeHandler(handler)
+    allure.attach(
+        handler.text() or "no logs captured",
+        name="test_log",
+        attachment_type=allure.attachment_type.TEXT,
+    )
 
 
 @pytest.fixture(scope="session")

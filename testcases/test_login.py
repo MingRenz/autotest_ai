@@ -42,6 +42,15 @@ def _assert_error(response, expected, title):
         )
 
 
+def _error_text(response) -> str:
+    body = response.json()
+    for key in ("detail", "message", "error"):
+        value = body.get(key) if isinstance(body, dict) else None
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
 def _assert_success(response, account_api, payload, expected, title):
     assert response.status_code == 200, f"{title}: {response.text}"
     body = response.json()
@@ -61,6 +70,7 @@ def _assert_success(response, account_api, payload, expected, title):
     assert profile["email"].strip().lower() == payload["email"].strip().lower(), (
         f"{title}: /me 返回邮箱与登录账号不一致"
     )
+    return profile
 
 
 @pytest.mark.datafile("login.yaml", group="standard")
@@ -90,6 +100,43 @@ def test_login(login_api, account_api, test_login_user, case):
         _assert_error(response, case["expected"], case["title"])
 
 
+@pytest.mark.datafile("login.yaml", group="error_consistency")
+@allure.title("{case[title]}")
+@allure.feature("登录模块")
+@allure.story("认证错误信息一致性")
+def test_login_error_consistency(login_api, test_login_user, case):
+    allure.dynamic.title(case["title"])
+    wrong_password_response = login_api.login(
+        {
+            "email": test_login_user["email"],
+            "password": case["wrong_password"],
+        }
+    )
+    unknown_user_response = login_api.login(
+        {
+            "email": case["unknown_email"],
+            "password": test_login_user["password"],
+        }
+    )
+
+    for response in (wrong_password_response, unknown_user_response):
+        assert response.status_code == case["expected"]["status"], (
+            f"{case['title']}: {response.text}"
+        )
+        assert extract_token(response.json()) is None, (
+            f"{case['title']}: 认证失败不得返回 Token"
+        )
+
+    wrong_message = _error_text(wrong_password_response)
+    unknown_message = _error_text(unknown_user_response)
+    assert wrong_message, f"{case['title']}: 错误密码响应缺少错误信息"
+    assert unknown_message, f"{case['title']}: 不存在用户响应缺少错误信息"
+    assert wrong_message == unknown_message, (
+        f"{case['title']}: 错误信息可用于枚举账号: "
+        f"wrong={wrong_message!r}, unknown={unknown_message!r}"
+    )
+
+
 @pytest.mark.datafile("login.yaml", group="admin")
 @allure.title("{case[title]}")
 @allure.feature("登录模块")
@@ -101,7 +148,12 @@ def test_login_admin(login_api, account_api, case):
     with allure.step("管理员登录"):
         response = login_api.login(payload)
 
-    _assert_success(response, account_api, payload, case["expected"], case["title"])
+    profile = _assert_success(
+        response, account_api, payload, case["expected"], case["title"]
+    )
+    assert profile["role"].strip().lower() in {"admin", "administrator"}, (
+        f"{case['title']}: /me 返回角色不是管理员，实际为 {profile['role']!r}"
+    )
 
 
 @pytest.mark.datafile("login.yaml", group="request_invalid")
