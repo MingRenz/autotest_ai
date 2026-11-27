@@ -1,10 +1,8 @@
 import threading
 import time
 from collections import deque
-from functools import lru_cache
 from typing import Dict, Optional
 
-from utils.config import load_config
 from utils.logger import get_logger
 
 
@@ -37,6 +35,7 @@ class RateLimitGuard:
             while True:
                 now = time.monotonic()
                 events = self._events[key]
+                # 先移出窗口外的请求，再判断当前配额。
                 while events and now - events[0] >= self.window_seconds:
                     events.popleft()
 
@@ -44,6 +43,7 @@ class RateLimitGuard:
                     events.append(now)
                     return
 
+                # 等待最早一条记录过期，再加上缓冲时间。
                 delay = self.window_seconds - (now - events[0]) + self.buffer_seconds
                 self.logger.info(
                     "RATE_LIMIT_WAIT key=%s limit=%s/%ss wait=%.1fs",
@@ -55,9 +55,7 @@ class RateLimitGuard:
                 time.sleep(max(delay, 0.01))
 
 
-@lru_cache(maxsize=1)
-def get_rate_limit_guard() -> RateLimitGuard:
-    config = load_config().get("rate_limit", {})
+def build_rate_limit_guard(config: dict) -> RateLimitGuard:
     return RateLimitGuard(
         limits={
             "register": config.get("register_per_minute", 0),

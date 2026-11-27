@@ -36,10 +36,17 @@ def _mask_form_text(text: str) -> str:
 def mask_sensitive(value: Any) -> Any:
     """递归脱敏 dict/list，并处理文本中的 Bearer Token 和表单字段。"""
     if isinstance(value, dict):
-        return {
-            key: ("***" if _is_sensitive_key(key) else mask_sensitive(item))
+        masked = {
+            key: "***" if _is_sensitive_key(key) else mask_sensitive(item)
             for key, item in value.items()
         }
+        # 422 校验可能在 input 回显凭据，字段名由 loc 指出。
+        location = value.get("loc")
+        if "input" in value and isinstance(location, list) and any(
+            _is_sensitive_key(field) for field in location
+        ):
+            masked["input"] = "***"
+        return masked
     if isinstance(value, (list, tuple)):
         return [mask_sensitive(item) for item in value]
     if isinstance(value, str):
@@ -50,3 +57,12 @@ def mask_sensitive(value: Any) -> Any:
             masked,
         )
     return value
+
+
+def response_for_report(response) -> Any:
+    """响应诊断采用脱敏副本，原始响应留给断言。"""
+    try:
+        body = response.json()
+    except ValueError:
+        body = response.text
+    return mask_sensitive(body)

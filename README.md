@@ -49,18 +49,17 @@
 ### 1. 数据驱动与可读性
 
 - 登录、注册用例均由 YAML 驱动
-- 每个 case 包含明确的 `title`、`input`、`delete_fields`、`expected`
-- pytest 参数 ID 包含 `case_id + title`
-- Allure 标题动态使用 `case["title"]`，避免所有用例显示同一个标题
+- 每条用例有 `id`、`title` 和 `expected`，按需声明输入差异和省略字段
+- pytest 参数 ID 由 YAML 编号和中文标题组成
+- Allure 从 `case["title"]` 取标题，写明场景和预期结果
 
 示例：
 
 ```yaml
 - id: LOGIN-003
-  title: 登录失败_密码错误
+  title: 已注册用户输入错误密码，登录返回 401
   group: standard
   input:
-    email: "$LOGIN_EMAIL"
     password: "Wrong!Passw0rd#2026"
   expected:
     status: 401
@@ -72,17 +71,17 @@
 - `random_register_data`：`function` 级，每个注册用例生成唯一邮箱/密码
 - `register_cleanup`：`function` 级，登记成功创建的账号并在 teardown 清理
 - 清理优先调用 `DELETE /api/v1/users/profile`，失败后尝试 `POST /api/v1/auth/logout`
-- 清理异常只记录日志，不影响后续用例
+- 删除失败时尝试登出并记录待清理账号。清理前登录或降级登出失败时，pytest 会报告 teardown 错误
 
 ### 3. 多角色客户端
 
 ```python
-guest_client = HttpClient(base_url=base_url)
-admin_client = HttpClient(base_url=base_url, token=admin_token)
-user_client = HttpClient(base_url=base_url, token=user_token)
+guest_client = HttpClient(base_url, rate_limiter=rate_limiter)
+admin_client = HttpClient(base_url, token=admin_token, rate_limiter=rate_limiter)
+user_client = HttpClient(base_url, token=user_token, rate_limiter=rate_limiter)
 ```
 
-每个客户端拥有独立 `requests.Session` 和独立 `Authorization`，避免测试上下文互相污染。
+每个客户端拥有独立的 `requests.Session` 和鉴权信息。同一次 pytest 会话内，角色客户端、临时清理客户端和并发客户端共享一个 `rate_limiter`。
 
 ### 4. 主动限流保护
 
@@ -108,7 +107,7 @@ RATE_LIMIT_WAIT key=register limit=5/60.0s wait=...
 - 动态标题：`allure.dynamic.title(case["title"])`
 - HTTP 请求和响应以折叠附件展示
 - 请求体、密码、Token、Cookie 自动脱敏
-- 控制台日志输出到 `stdout`，不再污染 Allure 的 `stderr`
+- 控制台日志输出到 `stdout`，同时写入滚动日志文件
 
 ---
 
@@ -141,14 +140,12 @@ testcases  —— 业务编排、参数化、断言、Allure 标记
 调用链：
 
 ```text
-YAML case
-  -> case fixture
-  -> test_login / test_register
-  -> LoginAPI / RegisterAPI
-  -> HttpClient
-  -> RateLimitGuard
-  -> requests.Session
-  -> Allure attachments + framework.log
+YAML → load_cases → @pytest.mark.parametrize
+  → 测试函数用 fixture 数据构造请求
+  → LoginAPI / RegisterAPI / AccountAPI
+  → HttpClient → 共享 RateLimitGuard → requests.Session
+  → 原始 Response 返回测试函数断言
+  → Allure 记录脱敏请求和响应，日志写入 framework.log
 ```
 
 职责边界：
@@ -191,13 +188,13 @@ auto_test_ai/
 ├── utils/
 │   ├── __init__.py
 │   ├── config.py               # 配置加载与环境变量覆盖
-│   ├── data_loader.py          # YAML 加载、分组、占位符替换
+│   ├── data_loader.py          # YAML 用例读取与分组
 │   ├── logger.py               # stdout + 文件日志
 │   ├── paths.py                # 项目路径
 │   ├── rate_limit.py           # 主动限流守卫
 │   ├── redaction.py            # 敏感信息脱敏
 │   └── token.py                # Token 提取
-├── conftest.py                 # pytest 参数化、case fixture、基础 client
+├── conftest.py                 # 配置、共享限流器、游客与管理员客户端
 ├── pytest.ini
 ├── requirements.txt
 ├── .gitignore
@@ -257,7 +254,7 @@ $env:ADMIN_PASSWORD = "local-admin-password"
 ### 运行测试
 
 ```powershell
-# 全量 65 条参数化用例（启用主动限流，执行时间会变长）
+# 全量 66 条参数化用例（启用主动限流，执行时间会变长）
 python -m pytest --clean-alluredir -q
 
 # 仅登录模块
@@ -277,7 +274,7 @@ allure open reports/allure-report
 `pytest.ini` 已配置：
 
 ```ini
-addopts = -ra --strict-markers --alluredir=reports/allure-results
+addopts = -ra --strict-markers --tb=short --alluredir=reports/allure-results --allure-no-capture
 ```
 
 因此运行 pytest 时无需再次指定 `--alluredir`。
@@ -319,10 +316,8 @@ python -m pytest testcases/test_login.py -q
 module: login
 cases:
   - id: LOGIN-005
-    title: 登录失败_邮箱字段缺失
+    title: 登录缺少 email 字段，返回 422 并定位到 email
     group: standard
-    input:
-      password: "$LOGIN_PASSWORD"
     delete_fields:
       - email
     expected:
@@ -332,7 +327,7 @@ cases:
 
 约定：
 
-- `input`：标准请求字段
+- `input` 覆盖默认请求字段。测试文件在发送请求前生成唯一邮箱和超长邮箱
 - `delete_fields`：明确删除哪些字段，替代容易混淆的 `remove`
 - `expected.status`：预期 HTTP 状态码
 - `expected.error_field`：422 时校验 `detail[].loc`
@@ -341,14 +336,15 @@ cases:
 
 ### 参数化机制
 
-`conftest.py` 只把 `case_id` 暴露给 pytest/Allure：
+测试文件直接声明 YAML 分组，测试函数收到普通字典。管理员凭据在运行时读取配置。
 
-```text
-case_id = LOGIN-003
-test id = LOGIN-003_登录失败_密码错误
+```python
+@pytest.mark.parametrize(
+    "case",
+    load_cases("login.yaml", group="standard"),
+    ids=lambda c: f"{c['id']}_{c['title']}",
+)
 ```
-
-完整 `case` 由 `case` fixture 根据 `case_id` 加载，因此 Allure 参数中不会出现完整字典、密码或 `$LOGIN_EMAIL` 占位符。
 
 ---
 
@@ -382,9 +378,9 @@ test id = LOGIN-003_登录失败_密码错误
 报告内容包括：
 
 - 明确的用例标题，例如：
-  - `登录成功_正确账号密码`
-  - `登录失败_密码错误`
-  - `注册失败_邮箱重复`
+  - `普通用户用正确凭据登录成功，且可查询本人资料`
+  - `已注册用户输入错误密码，登录返回 401`
+  - `同一邮箱再次注册返回 409，原账号仍可登录`
 - feature / story / severity 分层
 - 请求与响应 JSON 附件
 - 失败时的具体场景名和状态码
@@ -394,11 +390,11 @@ test id = LOGIN-003_登录失败_密码错误
 
 ## 测试覆盖
 
-当前共 **65 条参数化测试**：
+当前共 **66 条参数化测试**：
 
 | 模块 | 数量 | 覆盖 |
 |---|---:|---|
-| 登录 | 30 | 正向、密码错误、不存在用户、字段缺失、类型错误、非法邮箱、额外 `role`、SQLi/XSS、`/me` 鉴权 |
+| 登录 | 31 | 正向、密码错误、不存在用户、字段缺失、类型错误、非法邮箱、额外 `role`、SQLi/XSS、`/me` 鉴权 |
 | 注册 | 35 | 正向、可选 `phone`、合法/非法邮箱、必填、空串、类型错误、超长、弱密码、重复/并发、角色提权、XSS/SQLi |
 
 账号生命周期：

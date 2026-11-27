@@ -5,8 +5,8 @@ import allure
 import requests
 
 from utils.logger import get_logger
-from utils.rate_limit import get_rate_limit_guard
-from utils.redaction import mask_sensitive
+from utils.rate_limit import RateLimitGuard
+from utils.redaction import mask_sensitive, response_for_report
 
 
 class HttpClient:
@@ -18,13 +18,14 @@ class HttpClient:
         timeout: float = 10,
         token: Optional[str] = None,
         logger=None,
-        rate_limiter=None,
+        *,
+        rate_limiter: RateLimitGuard,
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
         self.logger = logger or get_logger("http")
-        self.rate_limiter = rate_limiter or get_rate_limit_guard()
+        self.rate_limiter = rate_limiter
 
         if token:
             self.set_token(token)
@@ -62,49 +63,47 @@ class HttpClient:
             self.rate_limiter.wait(self._rate_limit_key(path))
 
         url = self._url(path)
+        report_url = mask_sensitive(url)
         headers = dict(kwargs.pop("headers", {}) or {})
         headers.setdefault("Accept", "application/json")
         kwargs["headers"] = headers
         kwargs.setdefault("timeout", self.timeout)
         request_body = kwargs.get("json", kwargs.get("data"))
 
-        with allure.step(f"发送 {method.upper()} 请求: {url}"):
+        with allure.step(f"发送 {method.upper()} 请求 {report_url}"):
             self._attach_json(
                 "request",
                 {
                     "method": method.upper(),
-                    "url": url,
+                    "url": report_url,
                     "headers": headers,
                     "params": kwargs.get("params"),
                     "body": request_body,
                 },
             )
-            self.logger.info("REQUEST %s %s", method.upper(), url)
+            self.logger.info("REQUEST %s %s", method.upper(), report_url)
 
             try:
                 response = self.session.request(method=method, url=url, **kwargs)
             except requests.RequestException as exc:
-                self.logger.exception("REQUEST FAILED %s %s", method.upper(), url)
+                self.logger.error(
+                    "REQUEST FAILED %s %s (%s)", method.upper(), report_url, type(exc).__name__
+                )
                 self._attach_json("request_error", {"error": str(exc)})
                 raise
-
-            try:
-                response_body: Any = response.json()
-            except ValueError:
-                response_body = response.text
 
             self._attach_json(
                 "response",
                 {
                     "status_code": response.status_code,
                     "headers": dict(response.headers),
-                    "body": response_body,
+                    "body": response_for_report(response),
                 },
             )
             self.logger.info(
                 "RESPONSE %s %s -> %s (%.3fs)",
                 method.upper(),
-                url,
+                report_url,
                 response.status_code,
                 response.elapsed.total_seconds(),
             )

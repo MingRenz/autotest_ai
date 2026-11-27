@@ -1,12 +1,9 @@
 module: login
 cases:
-  # 普通用户登录主流程与认证/字段异常
+  # input 覆盖共用账号的默认登录数据，delete_fields 删除字段。
   - id: LOGIN-002
-    title: 登录成功_普通用户正确账号密码
+    title: 普通用户用正确凭据登录成功，且可查询本人资料
     group: standard
-    input:
-      email: "$LOGIN_EMAIL"
-      password: "$LOGIN_PASSWORD"
     expected:
       status: 200
       forbidden_fields:
@@ -15,28 +12,24 @@ cases:
         - hashed_password
 
   - id: LOGIN-003
-    title: 登录失败_密码错误
+    title: 已注册用户输入错误密码，登录返回 401
     group: standard
     input:
-      email: "$LOGIN_EMAIL"
       password: "Wrong!Passw0rd#2026"
     expected:
       status: 401
 
   - id: LOGIN-004
-    title: 登录失败_账号不存在
+    title: 未注册邮箱尝试登录，返回 401
     group: standard
     input:
-      email: "qa.login.missing.${RUN_ID}@example.com"
-      password: "$LOGIN_PASSWORD"
+      email: "qa.login.missing.{run_id}@example.com"
     expected:
       status: 401
 
   - id: LOGIN-005
-    title: 登录失败_邮箱字段缺失
+    title: 登录缺少 email 字段，返回 422 并定位到 email
     group: standard
-    input:
-      password: "$LOGIN_PASSWORD"
     delete_fields:
       - email
     expected:
@@ -44,11 +37,8 @@ cases:
       error_field: email
 
   - id: LOGIN-006
-    title: 登录失败_密码字段缺失
+    title: 登录缺少 password 字段，返回 422 并定位到 password
     group: standard
-    input:
-      email: "$LOGIN_EMAIL"
-      password: "$LOGIN_PASSWORD"
     delete_fields:
       - password
     expected:
@@ -56,147 +46,129 @@ cases:
       error_field: password
 
   - id: LOGIN-007
-    title: 登录失败_空密码
+    title: 登录密码为空字符串，返回 401
     group: standard
     input:
-      email: "$LOGIN_EMAIL"
       password: ""
     expected:
       status: 401
 
   - id: LOGIN-008-A
-    title: 登录失败_邮箱为null
+    title: 登录邮箱为 null，返回 422
     group: standard
     input:
       email: null
-      password: "$LOGIN_PASSWORD"
     expected:
       status: 422
       error_field: email
 
   - id: LOGIN-008-B
-    title: 登录失败_邮箱为数字
+    title: 登录邮箱为数字，返回 422
     group: standard
     input:
       email: 123
-      password: "$LOGIN_PASSWORD"
     expected:
       status: 422
       error_field: email
 
   - id: LOGIN-009-A
-    title: 登录失败_密码为null
+    title: 登录密码为 null，返回 422
     group: standard
     input:
-      email: "$LOGIN_EMAIL"
       password: null
     expected:
       status: 422
       error_field: password
 
   - id: LOGIN-009-B
-    title: 登录失败_密码为数字
+    title: 登录密码为数字，返回 422
     group: standard
     input:
-      email: "$LOGIN_EMAIL"
       password: 123
     expected:
       status: 422
       error_field: password
 
   - id: LOGIN-010-01
-    title: 登录失败_邮箱为空字符串
+    title: 登录邮箱为空字符串，返回 422
     group: standard
     input:
       email: ""
-      password: "$LOGIN_PASSWORD"
     expected:
       status: 422
       error_field: email
 
   - id: LOGIN-010-02
-    title: 登录失败_邮箱缺少@
+    title: 登录邮箱缺少 @，返回 422
     group: standard
     input:
       email: "plainaddress"
-      password: "$LOGIN_PASSWORD"
     expected:
       status: 422
       error_field: email
 
   - id: LOGIN-010-03
-    title: 登录失败_邮箱缺少域名
+    title: 登录邮箱缺少域名，返回 422
     group: standard
     input:
-      email: "qa.login.invalid.03.${RUN_ID}@"
-      password: "$LOGIN_PASSWORD"
+      email: "qa.login.invalid.03.{run_id}@"
     expected:
       status: 422
       error_field: email
 
   - id: LOGIN-010-04
-    title: 登录失败_邮箱缺少本地部分
+    title: 登录邮箱缺少本地部分，返回 422
     group: standard
     input:
       email: "@example.com"
-      password: "$LOGIN_PASSWORD"
     expected:
       status: 422
       error_field: email
 
   - id: LOGIN-010-05
-    title: 登录失败_邮箱含空格
+    title: 登录邮箱内部含空格，返回 422
     group: standard
     input:
-      email: "qa login.invalid.05.${RUN_ID}@example.com"
-      password: "$LOGIN_PASSWORD"
+      email: "qa login.invalid.05.{run_id}@example.com"
     expected:
       status: 422
       error_field: email
 
   - id: LOGIN-010-06
-    title: 登录失败_邮箱域名连续点
+    title: 登录邮箱域名含连续点，返回 422
     group: standard
     input:
-      email: "qa.login.invalid.06.${RUN_ID}@example..com"
-      password: "$LOGIN_PASSWORD"
+      email: "qa.login.invalid.06.{run_id}@example..com"
     expected:
       status: 422
       error_field: email
 
   - id: LOGIN-011
-    title: 登录成功_邮箱全大写
+    title: 登录邮箱全部大写，仍可查询本人资料
     group: standard
-    input:
-      email: "$LOGIN_EMAIL_UPPER"
-      password: "$LOGIN_PASSWORD"
+    email_transform: uppercase
     expected:
       status: 200
 
   - id: LOGIN-012
-    title: 登录成功_邮箱首尾空格
+    title: 登录邮箱首尾带空格，仍可查询本人资料
     group: standard
-    input:
-      email: "$LOGIN_EMAIL_SPACED"
-      password: "$LOGIN_PASSWORD"
+    email_transform: surround_with_spaces
     expected:
       status: 200
 
   - id: LOGIN-ERROR-CONSISTENCY
-    title: 安全_错误密码与不存在用户返回相同认证失败信息
+    title: 密码错误与邮箱未注册返回相同的认证失败文案
     group: error_consistency
     wrong_password: "Wrong!Passw0rd#2026"
-    unknown_email: "qa.login.missing.${RUN_ID}@example.com"
+    unknown_email: "qa.login.missing.{run_id}@example.com"
     expected:
       status: 401
 
   # 管理员登录
   - id: LOGIN-001
-    title: 登录成功_管理员正确账号密码
+    title: 管理员用正确凭据登录成功，且资料显示管理员角色
     group: admin
-    input:
-      email: "${ADMIN_EMAIL}"
-      password: "${ADMIN_PASSWORD}"
     expected:
       status: 200
       forbidden_fields:
@@ -206,7 +178,7 @@ cases:
 
   # 请求级异常
   - id: LOGIN-013
-    title: 登录失败_请求体缺失
+    title: 登录请求缺少请求体，返回 422
     group: request_invalid
     request:
       body: null
@@ -215,7 +187,7 @@ cases:
       status: 422
 
   - id: LOGIN-014
-    title: 登录失败_JSON格式错误
+    title: 登录请求的 JSON 无法解析，返回 400
     group: request_invalid
     request:
       body: '{"email":'
@@ -224,7 +196,7 @@ cases:
       status: 400
 
   - id: LOGIN-015
-    title: 登录失败_ContentType错误
+    title: 登录发送表单，请求返回 415
     group: request_invalid
     request:
       body: "email=qa.login.user%40example.com&password=Qa%21User%232026"
@@ -234,11 +206,9 @@ cases:
 
   # 额外字段与角色字段
   - id: LOGIN-016
-    title: 登录成功_额外role字段被忽略
+    title: 普通用户登录额外提交 role=admin，资料未返回管理员角色
     group: mass_assignment
     input:
-      email: "$LOGIN_EMAIL"
-      password: "$LOGIN_PASSWORD"
       role: "admin"
     expected:
       status: 200
@@ -246,43 +216,40 @@ cases:
 
   # 注入/XSS 输入
   - id: LOGIN-017
-    title: 登录失败_邮箱SQL注入
+    title: 登录邮箱含 SQL 注入样式的字符，返回 422
     group: security
     input:
       email: "qa' OR '1'='1@example.com"
-      password: "$LOGIN_PASSWORD"
     expected:
       status: 422
       error_field: email
 
   - id: LOGIN-018
-    title: 登录失败_密码SQL注入
+    title: 登录密码含 SQL 注入样式的字符，返回 401
     group: security
     input:
-      email: "$LOGIN_EMAIL"
       password: "' OR '1'='1"
     expected:
       status: 401
 
   - id: LOGIN-019
-    title: 登录失败_密码XSS
+    title: 登录密码含脚本字符，返回 401
     group: security
     input:
-      email: "$LOGIN_EMAIL"
       password: "<script>alert(1)</script>"
     expected:
       status: 401
 
   # /me 鉴权负向
   - id: LOGIN-020
-    title: 鉴权失败_未携带Authorization
+    title: 未携带鉴权头查询本人资料，返回 401
     group: auth_guard
     headers: {}
     expected:
       status: 401
 
   - id: LOGIN-021
-    title: 鉴权失败_Basic鉴权方案
+    title: 使用 Basic 方案查询本人资料，返回 401
     group: auth_guard
     headers:
       Authorization: "Basic dGVzdDp0ZXN0"
@@ -290,7 +257,7 @@ cases:
       status: 401
 
   - id: LOGIN-022-A
-    title: 鉴权失败_无效BearerToken
+    title: 使用无效 Bearer Token 查询本人资料，返回 401
     group: auth_guard
     headers:
       Authorization: "Bearer invalid-token"
@@ -298,7 +265,7 @@ cases:
       status: 401
 
   - id: LOGIN-022-B
-    title: 鉴权失败_篡改BearerToken
+    title: 使用模拟篡改的 Bearer Token 查询本人资料，返回 401
     group: auth_guard
     headers:
       Authorization: "Bearer invalid-token-tampered"

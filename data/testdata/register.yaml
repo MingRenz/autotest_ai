@@ -1,74 +1,60 @@
 module: register
 
-# 所有注册用例共享的合法基础输入；具体用例只声明差异字段或 delete_fields。
-base_input: &base_input
-  first_name: "$REGISTER_FIRST_NAME"
-  last_name: "$REGISTER_LAST_NAME"
-  email: "$REGISTER_EMAIL"
-  password: "$REGISTER_PASSWORD"
-  phone: "$REGISTER_PHONE"
-
+# 默认使用每条用例生成的合法数据。input 只写差异，delete_fields 明确省略字段。
 cases:
   # 正向：基础注册、可选 phone、合法邮箱等价类
   - id: REG-001-A
-    title: 注册成功_完整合法数据
+    title: 完整合法数据注册成功，新账号可以登录
     group: success
-    input: *base_input
     expected:
       status: 201
       verify_login: true
 
   - id: REG-001-B
-    title: 注册成功_phone字段省略
+    title: 省略可选的 phone 字段，注册成功
     group: success
-    input: *base_input
     delete_fields:
       - phone
     expected:
       status: 201
 
   - id: REG-001-C
-    title: 注册成功_phone为null
+    title: phone 显式传 null，注册成功
     group: success
     input:
-      <<: *base_input
       phone: null
     expected:
       status: 201
 
   - id: REG-003-A
-    title: 注册成功_普通邮箱
+    title: 使用普通邮箱注册成功
     group: success
     input:
-      <<: *base_input
-      email: "qa.reg.mail.standard.${RUN_ID}@example.com"
+      email: "qa.reg.mail.standard.{run_id}@example.com"
     expected:
       status: 201
 
   - id: REG-003-B
-    title: 注册成功_加号别名邮箱
+    title: 使用带加号别名的邮箱注册成功
     group: success
     input:
-      <<: *base_input
-      email: "qa.reg.mail.alias.${RUN_ID}+tag@example.com"
+      email: "qa.reg.mail.alias.{run_id}+tag@example.com"
     expected:
       status: 201
 
   - id: REG-003-C
-    title: 注册成功_子域邮箱
+    title: 使用子域名邮箱注册成功
     group: success
     input:
-      <<: *base_input
-      email: "qa.reg.mail.sub.${RUN_ID}@mail.example.com"
+      email: "qa.reg.mail.sub.{run_id}@mail.example.com"
     expected:
       status: 201
 
   # 字段校验：phone 类型、非法邮箱、必填缺失、空串、类型错误、超长、弱密码
   - id: REG-002
-    title: 注册失败_phone为数字
+    title: phone 为数字时注册返回 422，且账号无法登录
     group: field_validation
     input:
-      <<: *base_input
       phone: 13800138000
     expected:
       status: 422
@@ -76,69 +62,62 @@ cases:
       verify_not_created: true
 
   - id: REG-004-01
-    title: 注册失败_邮箱为空字符串
+    title: 注册邮箱为空字符串，返回 422
     group: field_validation
     input:
-      <<: *base_input
       email: ""
     expected:
       status: 422
       error_field: email
 
   - id: REG-004-02
-    title: 注册失败_邮箱缺少@
+    title: 注册邮箱缺少 @，返回 422
     group: field_validation
     input:
-      <<: *base_input
       email: "plainaddress"
     expected:
       status: 422
       error_field: email
 
   - id: REG-004-03
-    title: 注册失败_邮箱缺少域名
+    title: 注册邮箱缺少域名，返回 422
     group: field_validation
     input:
-      <<: *base_input
-      email: "qa.reg.invalid.03.${RUN_ID}@"
+      email: "qa.reg.invalid.03.{run_id}@"
     expected:
       status: 422
       error_field: email
 
   - id: REG-004-04
-    title: 注册失败_邮箱缺少本地部分
+    title: 注册邮箱缺少本地部分，返回 422
     group: field_validation
     input:
-      <<: *base_input
       email: "@example.com"
     expected:
       status: 422
       error_field: email
 
   - id: REG-004-05
-    title: 注册失败_邮箱含空格
+    title: 注册邮箱内部含空格，返回 422
     group: field_validation
     input:
-      <<: *base_input
-      email: "qa reg.invalid.05.${RUN_ID}@example.com"
+      email: "qa reg.invalid.05.{run_id}@example.com"
     expected:
       status: 422
       error_field: email
 
   - id: REG-004-06
-    title: 注册失败_邮箱域名连续点
+    title: 注册邮箱域名含连续点，返回 422
     group: field_validation
     input:
-      <<: *base_input
-      email: "qa.reg.invalid.06.${RUN_ID}@example..com"
+      email: "qa.reg.invalid.06.{run_id}@example..com"
     expected:
       status: 422
       error_field: email
 
   - id: REG-005
-    title: 注册失败_first_name缺失
+    title: 缺少 first_name 时注册返回 422，且账号无法登录
     group: field_validation
-    input: *base_input
     delete_fields:
       - first_name
     expected:
@@ -147,9 +126,8 @@ cases:
       verify_not_created: true
 
   - id: REG-006
-    title: 注册失败_last_name缺失
+    title: 缺少 last_name 时注册返回 422，且账号无法登录
     group: field_validation
-    input: *base_input
     delete_fields:
       - last_name
     expected:
@@ -158,9 +136,8 @@ cases:
       verify_not_created: true
 
   - id: REG-007
-    title: 注册失败_email缺失
+    title: 注册缺少 email 字段，返回 422 并定位到 email
     group: field_validation
-    input: *base_input
     delete_fields:
       - email
     expected:
@@ -168,9 +145,8 @@ cases:
       error_field: email
 
   - id: REG-008
-    title: 注册失败_password缺失
+    title: 注册缺少 password 字段，返回 422 并定位到 password
     group: field_validation
-    input: *base_input
     delete_fields:
       - password
     expected:
@@ -178,10 +154,9 @@ cases:
       error_field: password
 
   - id: REG-009
-    title: 注册失败_空first_name
+    title: first_name 为空字符串时注册返回 422，且账号无法登录
     group: field_validation
     input:
-      <<: *base_input
       first_name: ""
     expected:
       status: 422
@@ -189,10 +164,9 @@ cases:
       verify_not_created: true
 
   - id: REG-010
-    title: 注册失败_空last_name
+    title: last_name 为空字符串时注册返回 422，且账号无法登录
     group: field_validation
     input:
-      <<: *base_input
       last_name: ""
     expected:
       status: 422
@@ -200,30 +174,27 @@ cases:
       verify_not_created: true
 
   - id: REG-011
-    title: 注册失败_空password
+    title: 注册密码为空字符串，返回 422
     group: field_validation
     input:
-      <<: *base_input
       password: ""
     expected:
       status: 422
       error_field: password
 
   - id: REG-012
-    title: 注册失败_first_name为数字
+    title: 注册的 first_name 为数字，返回 422
     group: field_validation
     input:
-      <<: *base_input
       first_name: 123
     expected:
       status: 422
       error_field: first_name
 
   - id: REG-013
-    title: 注册失败_last_name为数组
+    title: 注册的 last_name 为数组，返回 422
     group: field_validation
     input:
-      <<: *base_input
       last_name:
         - Register
     expected:
@@ -231,20 +202,18 @@ cases:
       error_field: last_name
 
   - id: REG-014
-    title: 注册失败_email为数字
+    title: 注册邮箱为数字，返回 422
     group: field_validation
     input:
-      <<: *base_input
       email: 123
     expected:
       status: 422
       error_field: email
 
   - id: REG-015
-    title: 注册失败_password为对象
+    title: 注册密码为对象，返回 422
     group: field_validation
     input:
-      <<: *base_input
       password:
         value: "Qa!Passw0rd#2026"
     expected:
@@ -252,20 +221,17 @@ cases:
       error_field: password
 
   - id: REG-016
-    title: 注册失败_超长邮箱
+    title: 注册邮箱的本地部分有 300 个字符，返回 422
     group: field_validation
-    input:
-      <<: *base_input
-      email: "${LONG_EMAIL}"
+    email_local_length: 300
     expected:
       status: 422
       error_field: email
 
   - id: REG-017
-    title: 注册失败_弱密码1位
+    title: 注册密码只有 1 个字符，返回 422 且账号无法登录
     group: field_validation
     input:
-      <<: *base_input
       password: "P"
     expected:
       status: 422
@@ -274,7 +240,7 @@ cases:
 
   # 请求级异常
   - id: REG-020
-    title: 注册失败_请求体缺失
+    title: 注册请求缺少请求体，返回 422
     group: request_invalid
     request:
       body: null
@@ -283,7 +249,7 @@ cases:
       status: 422
 
   - id: REG-021
-    title: 注册失败_JSON格式错误
+    title: 注册请求的 JSON 无法解析，返回 400
     group: request_invalid
     request:
       body: '{"email":'
@@ -292,35 +258,32 @@ cases:
       status: 400
 
   - id: REG-022
-    title: 注册失败_ContentType错误
+    title: 注册发送表单，请求返回 415
     group: request_invalid
     request:
-      body: "first_name=Qa&last_name=Form&email=qa.register.form.${RUN_ID}%40example.com&password=Qa%21Passw0rd%232026"
+      body: "first_name=Qa&last_name=Form&email=qa.register.form.{run_id}%40example.com&password=Qa%21Passw0rd%232026"
       content_type: "application/x-www-form-urlencoded"
     expected:
       status: 415
 
   # 重复注册与并发
   - id: REG-018
-    title: 注册失败_邮箱重复
+    title: 同一邮箱再次注册返回 409，原账号仍可登录
     group: duplicate
-    input: *base_input
     expected:
       status: 409
 
   - id: REG-019
-    title: 注册失败_并发相同邮箱
+    title: 同一邮箱并发注册两次，分别返回 201 和 409
     group: concurrent
-    input: *base_input
     expected:
       status: 409
 
   # 角色提权
   - id: REG-023
-    title: 注册成功_额外role字段不提权
+    title: 注册额外提交管理员角色，新账号未获得管理员角色
     group: mass_assignment
     input:
-      <<: *base_input
       role: admin
     expected:
       status: 201
@@ -328,30 +291,27 @@ cases:
 
   # XSS / SQLi 字符串
   - id: REG-024
-    title: 注册成功_first_name包含XSS字符串
+    title: first_name 含脚本字符时注册成功，查询资料得到原值
     group: security
     input:
-      <<: *base_input
       first_name: "<script>alert('qa')</script>"
     expected:
       status: 201
       verify_field: first_name
 
   - id: REG-025
-    title: 注册成功_last_name包含SQLi字符串
+    title: last_name 含 SQL 注入样式的字符时注册成功，查询资料得到原值
     group: security
     input:
-      <<: *base_input
       last_name: "QA'); SELECT 1;--"
     expected:
       status: 201
       verify_field: last_name
 
   - id: REG-026
-    title: 注册成功_password包含SQLi字符串
+    title: 密码含 SQL 注入样式的字符时注册成功
     group: security
     input:
-      <<: *base_input
       password: "' OR '1'='1"
     expected:
       status: 201
